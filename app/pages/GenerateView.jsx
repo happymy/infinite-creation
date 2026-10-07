@@ -1,12 +1,58 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../api-client.js';
 import { useToast } from '../toast';
 import ShotsTab from './ShotsTab';
 
 // ============ 页2 · 生成内容 ============
-export default function GenerateView({ projectId, chapters, cursor, setCursor, running, onRun, onStop, onRefresh, onGoLogs }) {
+export default function GenerateView({ projectId, chapters, cursor, setCursor, running, onRun, onStop, onRefresh, onGoLogs, shotProg }) {
   const toast = useToast();
+  const [, setTick] = useState(0);
+  // 镜头进度起始时间：idx 变化时重置，用于估算剩余时间（H3 单步耗时基本均匀）
+  const startTs = useRef(0);
+  const lastIdx = useRef(null);
+  useEffect(() => {
+    if (shotProg && shotProg.idx !== lastIdx.current) { lastIdx.current = shotProg.idx; startTs.current = Date.now(); }
+  }, [shotProg]);
+  // ComfyUI 的 progress 事件间隔约 30-45s/步，光靠事件 ETA 不刷新 → 每秒重渲一次
+  useEffect(() => {
+    if (!running || !shotProg) return;
+    const t = setInterval(() => setTick((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [running, shotProg]);
+
+  function shotProgressCard() {
+    if (!running || !shotProg || (shotProg.value == null && !shotProg.node)) return null;
+    const hasSteps = shotProg.value != null && (shotProg.max || 0) > 1;
+    const max = shotProg.max || 1;
+    const value = hasSteps ? Math.min(Math.max(shotProg.value, 0), max) : 0;
+    const pct = hasSteps ? Math.round((value / max) * 100) : 0;
+    const elapsed = Math.max(0, (Date.now() - startTs.current) / 1000);
+    const fmt = (s) => { s = Math.max(0, Math.round(s)); const m = Math.floor(s / 60); return m + 'm' + String(s % 60).padStart(2, '0') + 's'; };
+    let eta = null;
+    if (hasSteps && value > 0) eta = fmt(elapsed / value * max - elapsed);
+    // 节点 id → 阶段名（H3 GGUF 工作流节点编号）
+    const NODE_LABELS = {
+      '136': '加载模型', '137': '文本编码', '145': '参考解析', '129': '采样中',
+      '157': '显存整理', '158': '显存整理', '74': '解码画面', '124': '音频解码', '125': '解码音轨',
+      '171': '合成视频', '92': '保存视频',
+    };
+    const stage = shotProg.node ? (NODE_LABELS[shotProg.node] || '处理中') : (hasSteps ? '采样中' : '准备中');
+    return (
+      <div style={{ marginTop: 12, padding: 10, border: '1px solid #2a2f3a', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
+        <div className="row" style={{ justifyContent: 'space-between', gap: 10 }}>
+          <strong>🎬 正在生成镜头 #{shotProg.idx} <span className="muted" style={{ fontSize: 13, fontWeight: 400 }}>· {stage}</span></strong>
+          <span className="muted" style={{ fontSize: 13 }}>{hasSteps ? value + '/' + max + ' 步 · ' : ''}已用 {fmt(elapsed)}{eta ? ' · 预计还需 ' + eta : ''}</span>
+        </div>
+        <div style={{ marginTop: 8, height: 8, background: '#1c2128', borderRadius: 4, overflow: 'hidden' }}>
+          {hasSteps
+            ? <div style={{ height: '100%', width: pct + '%', background: pct >= 100 ? '#3fb950' : '#2f81f7', transition: 'width .5s' }} />
+            : <div className="progress-indeterminate" style={{ height: '100%', width: '40%', background: '#2f81f7' }} />}
+        </div>
+        {shotProg.dataUrl && <img src={shotProg.dataUrl} alt="采样预览" style={{ marginTop: 8, maxWidth: 320, width: '100%', borderRadius: 6, border: '1px solid #2a2f3a' }} />}
+      </div>
+    );
+  }
   const cur = chapters[cursor] || chapters[0] || null;
   // 分阶段运行：待办数由后端算（不启 LLM），勾选后单独起一批
   const [stageList, setStageList] = useState(null);
@@ -74,6 +120,7 @@ export default function GenerateView({ projectId, chapters, cursor, setCursor, r
   return (
     <div>
       <div className="card">
+        {shotProgressCard()}
         <div className="row">
           <h2 style={{ margin: 0 }}>生成内容</h2>
           <select value={cursor} onChange={(e) => setCursor(Number(e.target.value))}>

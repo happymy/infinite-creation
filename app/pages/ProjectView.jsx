@@ -20,6 +20,8 @@ export default function ProjectView({ id, onBack }) {
   const [editOpen, setEditOpen] = useState(false);
   const [chapters, setChapters] = useState([]);
   const [cursor, setCursor] = useState(0);
+  // 当前镜头生成进度/实时预览（来自 broadcast 的 shot_progress / shot_preview 事件）
+  const [shotProg, setShotProg] = useState(null);
 
   const loadProject = useCallback(async () => {
     const [p, j, c] = await Promise.all([api.get('/api/projects/' + id), api.get('/api/projects/' + id + '/jobs'), api.get('/api/projects/' + id + '/chapters')]);
@@ -36,7 +38,11 @@ export default function ProjectView({ id, onBack }) {
       ws.onmessage = (ev) => {
         try {
           const m = JSON.parse(ev.data);
-          if (m.projectId === id) { setEvents((e) => [...e.slice(-200), m]); if (m.status === 'done' || m.status === 'failed') loadProject(); }
+          if (m.projectId === id) {
+            setEvents((e) => [...e.slice(-200), m]);
+            if (m.kind === 'shot_progress' || m.kind === 'shot_stage' || m.kind === 'shot_preview') setShotProg((p) => ({ ...(p || {}), ...m, ts: Date.now() }));
+            if (m.status === 'done' || m.status === 'failed') { setShotProg(null); loadProject(); }
+          }
         } catch {}
       };
       ws.onclose = () => {
@@ -87,7 +93,7 @@ export default function ProjectView({ id, onBack }) {
 
       <div style={{ marginTop: 16 }}>
         {pview === 'chapters' && <ChaptersView projectId={id} chapters={chapters} cursor={cursor} setCursor={setCursor} onRefresh={loadProject} />}
-        {pview === 'generate' && <GenerateView projectId={id} chapters={chapters} cursor={cursor} setCursor={setCursor} running={running} onRun={run} onStop={stop} onRefresh={loadProject} onGoLogs={() => setPview('logs')} />}
+        {pview === 'generate' && <GenerateView projectId={id} chapters={chapters} cursor={cursor} setCursor={setCursor} running={running} onRun={run} onStop={stop} onRefresh={loadProject} onGoLogs={() => setPview('logs')} shotProg={shotProg} />}
         {pview === 'assets' && <AssetsTab projectId={id} />}
         {pview === 'exports' && <ExportsTab projectId={id} />}
         {pview === 'logs' && <ConsoleTab projectId={id} events={events} jobs={jobs} onRefresh={loadProject} />}

@@ -32,6 +32,10 @@ h1 { font-size: 22px; } h2 { font-size: 17px; } h3 { font-size: 14px; color: #9a
 .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #2f6feb; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* 生成中不确定进度条：H3 节点不报逐步采样步数，用滚动条纹表示进行中 */
+.progress-indeterminate { animation: progress-slide 1.4s ease-in-out infinite; }
+@keyframes progress-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+
 .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
 .modal { background: #171b22; border: 1px solid #2a2f3a; border-radius: 12px; padding: 20px; width: min(700px, 92vw); max-height: 90vh; overflow-y: auto; }
 .modal h2 { margin-top: 0; }
