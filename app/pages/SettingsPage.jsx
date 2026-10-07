@@ -61,6 +61,11 @@ export default function SettingsPage({ onBack }) {
       {comfyInfo && comfyInfo.ok && !comfyInfo.dynamicVram && (cfg.generation.freeAfterEvery ?? cfg.generation.videoFreeAfterEvery ?? 0) > 0 && (
         <p className="muted" style={{ marginTop: 4 }}>⚠ 检测到当前 ComfyUI 未启用 Dynamic VRAM（--disable-dynamic-vram），连续生成不会产生该退化，建议关闭此功能（把 N 设为 0）。</p>
       )}
+      <label className="row" style={{ gap: 8, alignItems: 'center', marginTop: 10 }}>
+        <input type="checkbox" checked={!!(cfg.comfyui.previewFolderOpen ?? true)} onChange={(e) => setCfg({ ...cfg, comfyui: { ...cfg.comfyui, previewFolderOpen: e.target.checked } })} />
+        <span>生成时弹出预览文件夹（每步画面实时保存到 %TEMP%）</span>
+      </label>
+      <p className="muted" style={{ marginTop: 4 }}>生成过程中，每一步采样画面会保存为图片并自动弹出资源管理器查看；关闭后仅生成、不弹窗。前提：ComfyUI 需以 --preview-method auto 启动。</p>
       <br />
       <button className="primary" onClick={save}>保存配置</button>
 
